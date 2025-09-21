@@ -54,7 +54,7 @@ def plot_integrate_function(func: Callable, a: float, b: float) -> None:
     plt.show()
 
 
-def integrate_by_monte_carlo(func: Callable, a: float, b: float, points_number: int = 10_000) -> float:
+def integrate_by_monte_carlo(func: Callable, a: float, b: float, points_number: int = 10_000) -> tuple[float, float]:
     """
     Calculation of the integral of a function using the Monte Carlo method.
 
@@ -62,7 +62,7 @@ def integrate_by_monte_carlo(func: Callable, a: float, b: float, points_number: 
     :param a: Lower limit of integration (Float, mandatory)
     :param b: Upper limit of integration (Float, mandatory)
     :param points_number: Number of random points for integral calculation (Int, optional)
-    :return: Value of the integral (Float)
+    :return: Value of the integral and standard error value (Tuple of Float)
     """
 
     if not callable(func):
@@ -72,7 +72,12 @@ def integrate_by_monte_carlo(func: Callable, a: float, b: float, points_number: 
     y_min, y_max = np.min(func(x)), np.max(func(x))
     y = np.random.uniform(y_min, y_max, points_number)
     under_curve_points_number = np.sum(y < func(x))
-    return (b - a) * (y_max - y_min) * (under_curve_points_number / points_number)
+
+    # Estimated integral value
+    value = float((b - a) * (y_max - y_min) * (under_curve_points_number / points_number))
+    # Standard error of the mean estimate * interval width
+    se = float((b - a) * func(x).std(ddof=1) / np.sqrt(points_number))
+    return value, se
 
 
 def f(x: float) -> float:
@@ -87,24 +92,13 @@ def test_integrate() -> None:
     b = 2.0
 
     # Integration using Monte Carlo method
-    points_number = 1_000
-    integral_value = integrate_by_monte_carlo(f, a, b, points_number=points_number)
-    print(
-        f"Result of integration using Monte Carlo method: {integral_value} "
-        f"(number of random points {points_number}, number of experiments 1)"
-    )
-    points_number = 10_000
-    integral_value = integrate_by_monte_carlo(f, a, b, points_number=points_number)
-    print(
-        f"Result of integration using Monte Carlo method: {integral_value} "
-        f"(number of random points {points_number}, number of experiments 1)"
-    )
-    points_number = 100_000
-    integral_value = integrate_by_monte_carlo(f, a, b, points_number=points_number)
-    print(
-        f"Result of integration using Monte Carlo method: {integral_value} "
-        f"(number of random points {points_number}, number of experiments 1)"
-    )
+    for points_number in {1_000, 10_000, 100_000}:
+        integral_value, se_value = integrate_by_monte_carlo(f, a, b, points_number=points_number)
+        print(
+            f"Result of integration using Monte Carlo method: {integral_value} "
+            f"(estimate of the absolute error: {se_value:.15f})"
+            f" - number of random points {points_number}, number of experiments 1"
+        )
 
     experiments_number = 100
     points_number = 10_000
@@ -114,16 +108,19 @@ def test_integrate() -> None:
             executor.submit(integrate_by_monte_carlo, f, a, b, points_number=points_number)
             for _ in range(experiments_number)
         ]
-        integral_values: list[float] = [future.result() for future in futures]
+        integral_values: list[float] = [future.result()[0] for future in futures]
+        se_values: list[float] = [future.result()[1] for future in futures]
         integral_value = np.mean(integral_values)
+        se_value = np.mean(se_values)
     print(
         f"Result of integration using Monte Carlo method: {integral_value} "
+        f"(estimate of the absolute error: {se_value:.15f})"
         f"(number of random points {points_number}, number of experiments {experiments_number})"
     )
 
     # Integration using scipy.integrate.quad
     print(
-        "Result of integration using scipy.integrate.quad: {0} (estimate of the absolute error: {1})".format(
+        "Result of integration using scipy.integrate.quad: {0} (estimate of the absolute error: {1:.15f})".format(
             *spi.quad(f, a, b)
         )
     )
