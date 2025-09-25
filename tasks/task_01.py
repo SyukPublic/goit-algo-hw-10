@@ -54,6 +54,8 @@ def find_coins_greedy(coins: list[int], amount: int) -> dict[int, int]:
         if count > 0:
             change_coins[coin] = count
             amount -= coin * count
+        if amount < coins_sorted[-1]:
+            break
 
     if amount > 0:
         raise ValueError("It is not possible to give change with the given coins")
